@@ -1,0 +1,162 @@
+-- ============================================================
+-- SAÉ 2.01 — Création de la base de données relationnelle
+-- Données aéronautiques OpenSky Network
+-- SGBD : SQLite
+-- ============================================================
+
+-- Suppression des tables si elles existent (ordre inverse des FK)
+DROP TABLE IF EXISTS CapteurReception;
+DROP TABLE IF EXISTS MessageTCAS;
+DROP TABLE IF EXISTS VecteurEtat;
+DROP TABLE IF EXISTS Vol;
+DROP TABLE IF EXISTS Aeronef;
+DROP TABLE IF EXISTS AircraftType;
+
+-- ============================================================
+-- Table 1 : AircraftType
+-- Source : AircraftTypes.csv (dédupliquée sur Designator)
+-- Clé primaire : Designator (code OACI du type d'aéronef)
+-- DF : {Designator} → {AircraftDescription, Description, 
+--       EngineCount, EngineType, ManufacturerCode, ModelFullName, WTC}
+-- ============================================================
+CREATE TABLE AircraftType (
+    Designator        TEXT PRIMARY KEY,        -- Code OACI (ex: J328, A306)
+    AircraftDescription TEXT,                  -- Type général (LandPlane, Helicopter...)
+    Description       TEXT,                    -- Code descriptif (L2J, L1P...)
+    EngineCount       INTEGER,                 -- Nombre de moteurs
+    EngineType        TEXT,                    -- Type de moteur (Jet, Piston, Turboprop...)
+    ManufacturerCode  TEXT,                    -- Constructeur (Airbus, Boeing...)
+    ModelFullName     TEXT,                    -- Nom complet du modèle
+    WTC               TEXT                     -- Wake Turbulence Category (L, M, H, L/M)
+);
+
+-- ============================================================
+-- Table 2 : Aeronef
+-- Source : extraite de flightSample par normalisation (3NF)
+-- Clé primaire : registration (immatriculation officielle)
+-- DF : {registration} → {icao24, model, typecode}
+--      {model} → {typecode}
+-- Justification : on sépare les infos de l'avion des infos du vol
+-- pour éliminer la redondance (un avion fait plusieurs vols)
+-- ============================================================
+CREATE TABLE Aeronef (
+    registration      TEXT PRIMARY KEY,        -- Immatriculation (ex: N172UP)
+    icao24            TEXT,                    -- Identifiant transpondeur 24 bits
+    model             TEXT,                    -- Nom du modèle (ex: A300 F4-622R)
+    typecode          TEXT,                    -- Code type OACI (ex: A306)
+    FOREIGN KEY (typecode) REFERENCES AircraftType(Designator)
+);
+
+-- ============================================================
+-- Table 3 : Vol
+-- Source : flightSample (après extraction de Aeronef)
+-- Clé primaire : id_vol (auto-incrémenté)
+-- DF : {icao24, firstseen} → {tous les attributs du vol}
+-- Justification : les attributs temporels et géographiques
+-- décrivent un vol, pas un avion
+-- ============================================================
+CREATE TABLE Vol (
+    id_vol                INTEGER PRIMARY KEY AUTOINCREMENT,
+    icao24                TEXT,                -- Identifiant transpondeur
+    firstseen             REAL,                -- Premier horodatage Unix de détection
+    takeofftime           REAL,                -- Heure de décollage (Unix)
+    lastseen              REAL,                -- Dernier horodatage Unix de détection
+    landingtime           REAL,                -- Heure d'atterrissage (Unix)
+    callsign              TEXT,                -- Indicatif radio (ex: UPS312)
+    estdepartureairport   TEXT,                -- Aéroport départ estimé (code OACI)
+    airportofdeparture    TEXT,                -- Aéroport départ confirmé
+    estarrivalairport     TEXT,                -- Aéroport arrivée estimé
+    airportofdestination  TEXT,                -- Aéroport arrivée confirmé
+    registration          TEXT,                -- FK vers Aeronef
+    FOREIGN KEY (registration) REFERENCES Aeronef(registration)
+);
+
+-- ============================================================
+-- Table 4 : VecteurEtat
+-- Source : airbus_tree.csv
+-- Clé primaire : id_etat (auto-incrémenté)
+-- Clé candidate : {icao24, time}
+-- DF : {icao24, time} → {lat, lon, velocity, heading, vertrate,
+--       callsign, onground, alert, spi, squawk, baroaltitude,
+--       geoaltitude, lastposupdate, lastcontact, hour}
+-- ============================================================
+CREATE TABLE VecteurEtat (
+    id_etat           INTEGER PRIMARY KEY AUTOINCREMENT,
+    time              INTEGER,                 -- Horodatage Unix
+    icao24            TEXT,                    -- Identifiant transpondeur
+    lat               REAL,                    -- Latitude (degrés décimaux)
+    lon               REAL,                    -- Longitude (degrés décimaux)
+    velocity          REAL,                    -- Vitesse sol (m/s)
+    heading           REAL,                    -- Cap (degrés depuis le nord)
+    vertrate          REAL,                    -- Vitesse verticale (m/s)
+    callsign          TEXT,                    -- Indicatif radio
+    onground          INTEGER,                 -- Au sol (1) ou en vol (0)
+    alert             INTEGER,                 -- Alerte transpondeur (0/1)
+    spi               INTEGER,                 -- Identification spéciale (0/1)
+    squawk            TEXT,                    -- Code transpondeur 4 chiffres
+    baroaltitude      REAL,                    -- Altitude barométrique (m)
+    geoaltitude       REAL,                    -- Altitude GPS (m)
+    lastposupdate     REAL,                    -- Dernier update position (Unix)
+    lastcontact       REAL,                    -- Dernier contact (Unix)
+    hour              INTEGER                  -- Début heure de collecte (Unix)
+);
+
+-- ============================================================
+-- Table 5 : MessageTCAS
+-- Source : part_1.xlsx (sans la colonne sensors)
+-- Clé primaire : id_message (auto-incrémenté)
+-- DF : {rawMsg, minTime} → {tous les attributs du message}
+-- Justification : la colonne sensors (multi-valuée) est extraite
+-- dans CapteurReception pour respecter la 1NF
+-- ============================================================
+CREATE TABLE MessageTCAS (
+    id_message                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    rawMsg                      TEXT,          -- Message brut ADS-B (hexadécimal)
+    minTime                     REAL,          -- Premier horodatage réception
+    maxTime                     REAL,          -- Dernier horodatage réception
+    msgCount                    INTEGER,       -- Nombre de messages regroupés
+    icao24                      TEXT,          -- Identifiant transpondeur
+    isLongFormat                INTEGER,       -- Format long (0/1)
+    isAirborne                  INTEGER,       -- En vol (0/1)
+    hasCrossLinkCapability      INTEGER,       -- Capacité liaison ACAS (0/1/NULL)
+    sensitivityLevel            INTEGER,       -- Niveau sensibilité TCAS
+    replyInformation            INTEGER,       -- Code réponse Mode S
+    altitude                    REAL,          -- Altitude
+    hasValidRAC                 INTEGER,       -- RAC valide (0/1)
+    activeResolutionAdvisories  INTEGER,       -- Code avis résolution actifs
+    resolutionAdvisoryComplement INTEGER,      -- Complément avis résolution
+    noPassBelow                 INTEGER,       -- Interdiction passer dessous (0/1)
+    noPassAbove                 INTEGER,       -- Interdiction passer dessus (0/1)
+    noTurnLeft                  INTEGER,       -- Restriction virage gauche (0/1)
+    noTurnRight                 INTEGER,       -- Restriction virage droite (0/1)
+    hasTerminated               INTEGER,       -- Avis terminé (0/1)
+    hasMultipleThreats          INTEGER        -- Menaces multiples (0/1)
+);
+
+-- ============================================================
+-- Table 6 : CapteurReception
+-- Source : extraite de la colonne "sensors" de part_1.xlsx
+-- Clé primaire : id_reception (auto-incrémenté)
+-- Justification : la colonne sensors contient une LISTE de
+-- capteurs → relation 1:N → table séparée pour la 1NF
+-- (une valeur atomique par cellule)
+-- ============================================================
+CREATE TABLE CapteurReception (
+    id_reception      INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_message        INTEGER,                 -- FK vers MessageTCAS
+    serial            INTEGER,                 -- Identifiant du capteur
+    minTime           REAL,                    -- Premier instant réception capteur
+    maxTime           REAL,                    -- Dernier instant réception capteur
+    FOREIGN KEY (id_message) REFERENCES MessageTCAS(id_message)
+);
+
+-- ============================================================
+-- Index pour améliorer les performances des jointures
+-- ============================================================
+CREATE INDEX idx_aeronef_typecode ON Aeronef(typecode);
+CREATE INDEX idx_aeronef_icao24 ON Aeronef(icao24);
+CREATE INDEX idx_vol_registration ON Vol(registration);
+CREATE INDEX idx_vol_icao24 ON Vol(icao24);
+CREATE INDEX idx_vecteur_icao24_time ON VecteurEtat(icao24, time);
+CREATE INDEX idx_message_icao24 ON MessageTCAS(icao24);
+CREATE INDEX idx_capteur_id_message ON CapteurReception(id_message);
