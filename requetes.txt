@@ -34,17 +34,16 @@ CREATE TABLE AircraftType (
 
 -- ============================================================
 -- Table 2 : Aeronef
--- Source : extraite de flightSample par normalisation (3NF)
+-- Source : extraite de flightSample par normalisation (3NF stricte)
 -- Clé primaire : registration (immatriculation officielle)
--- DF : {registration} → {icao24, model, typecode}
---      {model} → {typecode}
--- Justification : on sépare les infos de l'avion des infos du vol
--- pour éliminer la redondance (un avion fait plusieurs vols)
+-- DF : {registration} → {icao24, typecode}
+-- Justification : on sépare les infos de l'avion des infos du vol.
+-- L'attribut 'model' a été supprimé pour respecter la 3NF car il dépend 
+-- de 'typecode'. Le nom du modèle est retrouvé via AircraftType.
 -- ============================================================
 CREATE TABLE Aeronef (
     registration      TEXT PRIMARY KEY,        -- Immatriculation (ex: N172UP)
     icao24            TEXT,                    -- Identifiant transpondeur 24 bits
-    model             TEXT,                    -- Nom du modèle (ex: A300 F4-622R)
     typecode          TEXT,                    -- Code type OACI (ex: A306)
     FOREIGN KEY (typecode) REFERENCES AircraftType(Designator)
 );
@@ -53,13 +52,12 @@ CREATE TABLE Aeronef (
 -- Table 3 : Vol
 -- Source : flightSample (après extraction de Aeronef)
 -- Clé primaire : id_vol (auto-incrémenté)
--- DF : {icao24, firstseen} → {tous les attributs du vol}
--- Justification : les attributs temporels et géographiques
--- décrivent un vol, pas un avion
+-- DF : {registration, firstseen} → {tous les attributs du vol}
+-- Justification : L'attribut 'icao24' a été retiré pour respecter la 3NF, 
+-- car il est déjà déterminé par 'registration' (transitivité).
 -- ============================================================
 CREATE TABLE Vol (
     id_vol                INTEGER PRIMARY KEY AUTOINCREMENT,
-    icao24                TEXT,                -- Identifiant transpondeur
     firstseen             REAL,                -- Premier horodatage Unix de détection
     takeofftime           REAL,                -- Heure de décollage (Unix)
     lastseen              REAL,                -- Dernier horodatage Unix de détection
@@ -158,11 +156,14 @@ CREATE TABLE CapteurReception (
 CREATE INDEX idx_aeronef_typecode ON Aeronef(typecode);
 CREATE INDEX idx_aeronef_icao24 ON Aeronef(icao24);
 CREATE INDEX idx_vol_registration ON Vol(registration);
-CREATE INDEX idx_vol_icao24 ON Vol(icao24);
+-- CREATE INDEX idx_vol_icao24 ON Vol(icao24); -- supprimé car icao24 n'est plus dans Vol
 CREATE INDEX idx_vecteur_icao24_time ON VecteurEtat(icao24, time);
 CREATE INDEX idx_message_icao24 ON MessageTCAS(icao24);
 CREATE INDEX idx_capteur_id_message ON CapteurReception(id_message);
 
 
--- Exemple de requête : Vols par type de moteur
+-- Requête pour la visualisation 1 : Vols par type de moteur
 SELECT at.EngineType, COUNT(*) FROM Vol v JOIN Aeronef a ON v.registration = a.registration JOIN AircraftType at ON a.typecode = at.Designator GROUP BY at.EngineType;
+
+-- Requête pour la visualisation 2 : Avions par WTC
+SELECT at.WTC, COUNT(a.registration) FROM Aeronef a JOIN AircraftType at ON a.typecode = at.Designator GROUP BY at.WTC;
