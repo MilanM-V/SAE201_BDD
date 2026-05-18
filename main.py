@@ -49,7 +49,6 @@ def toBoolInt(val):
 def main():
     print("Début du traitement...")
 
-    """Connexion à la base de données"""
     if os.path.exists(dbName):os.remove(dbName)
     conn=sqlite3.connect(dbName)
     
