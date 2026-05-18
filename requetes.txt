@@ -1,10 +1,3 @@
--- REQUÊTES SQL SAE 2.01
--- 20 requêtes : SELECT, JOIN, CTE (WITH), VIEW, CASE
-
--- ============================================================
--- SCHEMA DE LA BASE DE DONNEES
--- ============================================================
-
 -- ============================================================
 -- SAÉ 2.01 — Création de la base de données relationnelle
 -- Données aéronautiques OpenSky Network
@@ -178,13 +171,8 @@ CREATE INDEX idx_vol_registration ON Vol(registration);
 CREATE INDEX idx_vecteur_icao24_time ON VecteurEtat(icao24, time);
 CREATE INDEX idx_message_icao24 ON MessageTCAS(icao24);
 CREATE INDEX idx_capteur_id_message ON CapteurReception(id_message);
-
-
--- ============================================================
--- CREATION DES VUES
--- ============================================================
-
--- Vue 1 : Répartition par type d'aéronef
+VUES
+Répartition par type d'aéronef
 CREATE VIEW IF NOT EXISTS vue_type_aeronef AS
 SELECT AircraftDescription, COUNT(*) as nb
 FROM AircraftType
@@ -192,14 +180,14 @@ WHERE AircraftDescription IS NOT NULL
 GROUP BY AircraftDescription
 ORDER BY nb DESC;
 
--- Vue 2 : Proportion en vol vs au sol
+Proportion en vol vs au sol
 CREATE VIEW IF NOT EXISTS vue_statut_vol AS
 SELECT CASE WHEN onground = 1 THEN 'Au sol' ELSE 'En vol' END as statut,
        COUNT(*) as nb
 FROM VecteurEtat
 GROUP BY onground;
 
--- Vue 3 : Statistiques par aéroport de départ
+Statistiques par aéroport de départ
 CREATE VIEW IF NOT EXISTS vue_stats_aeroport AS
 SELECT COALESCE(ar.ville, v.airportofdeparture) as nom_depart,
        COUNT(*) as nb_departs,
@@ -210,16 +198,13 @@ LEFT JOIN Aeroport_Ref ar ON v.airportofdeparture = ar.code_oaci
 WHERE v.airportofdeparture IS NOT NULL
 GROUP BY nom_depart;
 
--- Vue 4 : Correspondance ICAO24 et informations aéronefs
+Correspondance ICAO24 et informations aéronefs
 CREATE VIEW IF NOT EXISTS vue_icao24_aeronef AS
 SELECT a.icao24, a.registration, at.AircraftDescription, at.ManufacturerCode, at.ModelFullName
 FROM Aeronef a
 JOIN AircraftType at ON a.typecode = at.Designator
 WHERE a.icao24 IS NOT NULL AND a.icao24 != '';
 
--- ============================================================
--- LES 20 REQUETES
--- ============================================================
 
 -- Requête 1 (SELECT+JOIN) : Nombre de vols par type de moteur
 SELECT at.EngineType, COUNT(*) as nb_vols

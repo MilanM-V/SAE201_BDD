@@ -93,7 +93,37 @@ La base de données finale a été implémentée sous **SQLite**.
 * CapteurReception (**id_reception**, #id_message, serial, minTime, maxTime)
 * Aeroport_Ref (**code_oaci**, nom, ville, pays)
 
-*[Insérer ici une capture d'image propre du schéma de la BDD généré via un outil (ex: DBeaver, draw.io)]*
+```mermaid
+flowchart LR
+    %% Définition des tables avec détails
+    AircraftType["<b>AircraftType</b><br/><hr/><br/><b>PK</b> Designator<br/>AircraftDescription<br/>EngineCount<br/>EngineType<br/>ManufacturerCode<br/>ModelFullName<br/>WTC"]
+    
+    Aeronef["<b>Aeronef</b><br/><hr/><br/><b>PK</b> registration<br/>icao24<br/><b>FK</b> typecode"]
+    
+    Vol["<b>Vol</b><br/><hr/><br/><b>PK</b> id_vol<br/><b>FK</b> registration<br/>firstseen, lastseen<br/>takeofftime, landingtime<br/>airportofdeparture<br/>airportofdestination<br/>callsign"]
+    
+    VecteurEtat["<b>VecteurEtat</b><br/><hr/><br/><b>PK</b> id_etat<br/>time, icao24<br/>lat, lon<br/>velocity, heading<br/>vertrate, baroaltitude<br/>alert, onground"]
+    
+    MessageTCAS["<b>MessageTCAS</b><br/><hr/><br/><b>PK</b> id_message<br/>icao24, rawMsg<br/>sensitivityLevel<br/>altitude, isAirborne<br/>hasMultipleThreats"]
+    
+    CapteurReception["<b>CapteurReception</b><br/><hr/><br/><b>PK</b> id_reception<br/><b>FK</b> id_message<br/>serial<br/>minTime, maxTime"]
+    
+    Aeroport_Ref["<b>Aeroport_Ref</b><br/><hr/><br/><b>PK</b> code_oaci<br/>nom<br/>ville<br/>pays"]
+
+    %% Relations (Flèches)
+    AircraftType -->|Possède| Aeronef
+    Aeronef -->|Effectue| Vol
+    MessageTCAS -->|Est reçu par| CapteurReception
+
+    %% Couleurs et Design
+    style AircraftType fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
+    style Aeronef fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    style Vol fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000
+    style VecteurEtat fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    style MessageTCAS fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000
+    style CapteurReception fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000
+    style Aeroport_Ref fill:#eceff1,stroke:#263238,stroke-width:2px,color:#000
+```
 
 # 5. Visualisations, Requêtes SQL et Analyse
 
@@ -114,7 +144,7 @@ JOIN Aeronef a ON v.registration = a.registration
 JOIN AircraftType at ON a.typecode = at.Designator 
 GROUP BY at.EngineType;
 ```
-*[Insérer l'image `graph_moteurs.png`]*
+![Répartition des vols par type de moteur](Graphiques/graph_01_vols_moteur.png)
 **Analyse :** Ce graphique en barres met en évidence la forte prédominance des avions à réacteurs ("Jet") dans les vols commerciaux de notre échantillon, comparativement aux autres types de moteurs (comme "Turboprop").
 
 ### 5.2 Répartition des avions selon la catégorie WTC
@@ -124,7 +154,7 @@ FROM Aeronef a
 JOIN AircraftType at ON a.typecode = at.Designator 
 GROUP BY at.WTC;
 ```
-*[Insérer l'image `graph_02_avions_wtc.png`]*
+![Répartition des avions selon la catégorie WTC](Graphiques/graph_02_avions_wtc.png)
 **Analyse :** Le diagramme en barres montre la proportion des catégories WTC (Wake Turbulence Category). Cela nous permet d'évaluer le gabarit global des aéronefs de notre base de données (catégorie M "Medium", H "Heavy", etc.).
 
 ### 5.3 Croisement des données et Enrichissement
@@ -163,6 +193,126 @@ Pour aller plus loin que les simples graphiques 2D, nous avons développé un sc
 - **Visualiser les pôles d'activité :** Les 50 aéroports enregistrant le plus de départs sont représentés par des cercles proportionnels à leur affluence.
 - **Tracer les axes majeurs :** Les 100 routes aériennes les plus fréquentées sont modélisées par des lignes liant les aéroports.
 - **Afficher une trajectoire réelle (L'Easter Egg du Sapin Airbus) :** En exploitant la table `VecteurEtat`, nous avons extrait les points GPS de l'aéronef le plus actif de notre base. Le tracé généré révèle une surprise glissée dans le jeu de données (fichier `airbus_tree.csv`) : le célèbre vol de test d'un Airbus A380 (ICAO24 `3807fa`) qui a délibérément volé au-dessus de l'Allemagne en dessinant **un sapin de Noël géant**. Cette trouvaille prouve l'efficacité de nos requêtes de géolocalisation et illustre concrètement l'intérêt d'une télémétrie à haute fréquence.
+
+### 5.5 Catalogue complet des Analyses Visuelles
+
+Voici la compilation complète des autres graphiques générés par notre architecture, organisés sous forme de tableaux de bord thématiques.
+
+#### 🌍 Infrastructures et Réseaux (Aéroports & Routes)
+
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_03_top_aeroports.png" width="90%" />
+      <br><em>Top 10 Aéroports de départ</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_08_top_routes.png" width="90%" />
+      <br><em>Top 10 Routes Aériennes</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_12_aeroports_destinations.png" width="90%" />
+      <br><em>Destinations par Aéroport</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+    </td>
+  </tr>
+</table>
+
+#### ✈️ Profils et Caractéristiques des Aéronefs
+
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_04_top_constructeurs.png" width="90%" />
+      <br><em>Top Constructeurs</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_05_nb_moteurs.png" width="90%" />
+      <br><em>Répartition du Nombre de Moteurs</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_07_top_aeronefs.png" width="90%" />
+      <br><em>Top 10 Aéronefs Actifs</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_10_types_aeronef.png" width="90%" />
+      <br><em>Types d'Aéronefs</em>
+    </td>
+  </tr>
+</table>
+
+#### ⏱️ Performances et Statistiques de Vol
+
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_06_duree_wtc.png" width="90%" />
+      <br><em>Durée moyenne par WTC</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_09_vitesse_altitude.png" width="90%" />
+      <br><em>Vitesse moyenne selon l'Altitude</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_11_duree_constructeur.png" width="90%" />
+      <br><em>Durée moyenne par Constructeur</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_13_distrib_altitude.png" width="90%" />
+      <br><em>Distribution de l'Altitude</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_15_vols_par_heure.png" width="90%" />
+      <br><em>Décollages par tranche horaire</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+    </td>
+  </tr>
+</table>
+
+#### 🚨 Sécurité et Télémétrie Avancée (TCAS & Transpondeur)
+
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_14_tcas_sensibilite.png" width="90%" />
+      <br><em>Messages TCAS par niveau de Sensibilité</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_16_tcas_constructeur.png" width="90%" />
+      <br><em>Messages TCAS par Constructeur</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_17_altitude_type.png" width="90%" />
+      <br><em>Altitude moyenne par type d'Aéronef</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_18_top_squawk.png" width="90%" />
+      <br><em>Top 10 des codes Squawk</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_19_tcas_menaces.png" width="90%" />
+      <br><em>Sensibilité face aux menaces multiples</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_20_alertes_altitude.png" width="90%" />
+      <br><em>Part des alertes par tranche d'altitude</em>
+    </td>
+  </tr>
+</table>
 
 # 6. Problèmes Rencontrés, Solutions Apportées et Conclusion
 
