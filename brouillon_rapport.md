@@ -181,11 +181,13 @@ Grâce à cet enrichissement, nous avons implémenté plusieurs nouvelles analys
 - **Performance des flottes (Requête 11)** : Nous avons calculé la durée moyenne des vols selon le constructeur de l'avion, croisant ainsi les horaires effectifs et la documentation de l'aéronef.
 - **Activité par tranche horaire (Requête 15)** : Nous avons généré un graphique affichant le nombre de décollages par heure de la journée. Le jeu de données `flightSample` ne couvrant que la journée du **1er Septembre 2022**, nous l'avons explicitement précisé sur le titre et l'axe du graphique pour éviter toute confusion.
 - **Le croisement Constructeur / Messages TCAS (Requête 16)** : En liant `MessageTCAS` à la vue, nous avons pu identifier quels constructeurs émettent le plus de messages TCAS dans notre échantillon.
-- **L'altitude moyenne par type d'appareil (Requête 17)** : En croisant les données TCAS avec les caractéristiques techniques, nous mettons en évidence les plafonds de vol réels observés selon la classe de l'aéronef.
 - **La distribution des alertes transpondeur (Requêtes 18 et 20)** : Nous analysons les codes Squawk anormaux et observons si les alertes enregistrées (`alert=1` dans `VecteurEtat`) se concentrent sur des tranches d'altitude spécifiques (ex: phases de décollage/atterrissage < 3000m).
-- **Complexité des menaces TCAS (Requête 19)** : Remplacement de la simple proportion Air/Sol par l'analyse des menaces multiples simultanées selon le niveau de sensibilité TCAS de l'appareil.
+- **Complexité des menaces TCAS (Requête 19)** : Analyse des menaces multiples simultanées selon le niveau de sensibilité TCAS de l'appareil.
 
-Ces requêtes démontrent la robustesse de notre modèle relationnel, capable de lier des référentiels statiques à des flux de télémétrie massifs pour en extraire des indicateurs métiers pertinents. Notez également que nous avons privilégié les graphiques en barres pour la quasi-totalité des visualisations, évitant ainsi les graphiques circulaires ("camemberts") souvent critiqués pour leur manque de précision visuelle.
+**Recherche de corrélations (Requêtes 5, 10, 17) :**
+Au-delà des simples comptages et répartitions, nous avons voulu aller plus loin en réalisant des **analyses de corrélation** sous forme de nuages de points (scatter plots). Cette approche, fondamentale en science des données, permet de vérifier si deux variables quantitatives sont liées par une relation statistique. Un coefficient de corrélation `r` proche de 1 ou -1 indique une relation forte, tandis qu'un `r` proche de 0 indique l'absence de lien.
+
+Ces requêtes démontrent la robustesse de notre modèle relationnel, capable de lier des référentiels statiques à des flux de télémétrie massifs pour en extraire des indicateurs métiers pertinents. Notez également que nous avons privilégié les graphiques en barres et les nuages de points (scatter plots) pour nos visualisations, évitant les graphiques circulaires ("camemberts") souvent critiqués pour leur manque de précision visuelle.
 
 ### 5.4 Cartographie Interactive (Folium)
 
@@ -221,6 +223,8 @@ Voici la compilation complète des autres graphiques générés par notre archit
   </tr>
 </table>
 
+**Analyse :** Le classement des villes de départ fait ressortir les grands hubs européens (Paris, Londres, Amsterdam, Francfort) comme pôles d'activité dominants. La fusion des aéroports par ville (cf. enrichissement géographique) donne une vision réaliste du trafic. Les routes les plus empruntées correspondent aux axes commerciaux historiques du continent. Le graphique des destinations par aéroport révèle la connectivité des hubs : un aéroport comme Paris dessert un nombre de destinations nettement supérieur aux aéroports régionaux.
+
 #### ✈️ Profils et Caractéristiques des Aéronefs
 
 <table style="width: 100%; border-collapse: collapse; border: none;">
@@ -230,21 +234,13 @@ Voici la compilation complète des autres graphiques générés par notre archit
       <br><em>Top Constructeurs</em>
     </td>
     <td style="width: 50%; text-align: center; border: none; padding: 10px;">
-      <img src="Graphiques/graph_05_nb_moteurs.png" width="90%" />
-      <br><em>Répartition du Nombre de Moteurs</em>
-    </td>
-  </tr>
-  <tr>
-    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
       <img src="Graphiques/graph_07_top_aeronefs.png" width="90%" />
       <br><em>Top 10 Aéronefs Actifs</em>
     </td>
-    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
-      <img src="Graphiques/graph_10_types_aeronef.png" width="90%" />
-      <br><em>Types d'Aéronefs</em>
-    </td>
   </tr>
 </table>
+
+**Analyse :** Le classement des constructeurs par nombre de modèles référencés dans la base met en lumière la domination de certains acteurs historiques de l'aviation (Boeing, Cessna, Airbus). Le top 10 des aéronefs les plus actifs permet d'identifier les appareils ayant effectué le plus grand nombre de rotations sur la journée d'observation, ce qui peut refléter des usages de navettes régionales à forte cadence.
 
 #### ⏱️ Performances et Statistiques de Vol
 
@@ -279,6 +275,8 @@ Voici la compilation complète des autres graphiques générés par notre archit
   </tr>
 </table>
 
+**Analyse :** La durée moyenne par catégorie WTC confirme l'intuition aéronautique : les avions "Heavy" (gros porteurs long-courriers) ont des durées de vol significativement plus longues que les "Medium" ou "Light". Le graphique Vitesse/Altitude en courbe montre une accélération progressive avec l'altitude, typique des phases de montée. La distribution des altitudes révèle que la majorité des mesures se situent au-dessus de 9 km, correspondant aux altitudes de croisière des vols commerciaux. Enfin, le profil horaire des décollages fait apparaître les créneaux de pointe du trafic aérien (pic matinal et pic de fin d'après-midi).
+
 #### 🚨 Sécurité et Télémétrie Avancée (TCAS & Transpondeur)
 
 <table style="width: 100%; border-collapse: collapse; border: none;">
@@ -294,25 +292,54 @@ Voici la compilation complète des autres graphiques générés par notre archit
   </tr>
   <tr>
     <td style="width: 50%; text-align: center; border: none; padding: 10px;">
-      <img src="Graphiques/graph_17_altitude_type.png" width="90%" />
-      <br><em>Altitude moyenne par type d'Aéronef</em>
-    </td>
-    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
       <img src="Graphiques/graph_18_top_squawk.png" width="90%" />
       <br><em>Top 10 des codes Squawk</em>
     </td>
-  </tr>
-  <tr>
     <td style="width: 50%; text-align: center; border: none; padding: 10px;">
       <img src="Graphiques/graph_19_tcas_menaces.png" width="90%" />
       <br><em>Sensibilité face aux menaces multiples</em>
     </td>
+  </tr>
+  <tr>
     <td style="width: 50%; text-align: center; border: none; padding: 10px;">
       <img src="Graphiques/graph_20_alertes_altitude.png" width="90%" />
       <br><em>Part des alertes par tranche d'altitude</em>
     </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+    </td>
   </tr>
 </table>
+
+**Analyse :** Les messages TCAS se concentrent sur les niveaux de sensibilité élevés (6 et 7), ce qui est cohérent car ces niveaux s'activent en phase de croisière où le trafic est dense. Le croisement TCAS/Constructeur montre que les avionneurs ayant le plus d'appareils dans notre base (Airbus, Boeing) génèrent naturellement le plus de messages. Les codes Squawk les plus fréquents (1000, 2000, 7000) correspondent aux codes standards européens. Enfin, la répartition des alertes par altitude montre que la majorité des alertes transpondeur se concentrent dans les basses altitudes (0-3000m), correspondant aux phases critiques de décollage et d'atterrissage.
+
+#### 📊 Recherche de Corrélations (Scatter Plots)
+
+<table style="width: 100%; border-collapse: collapse; border: none;">
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_10_corr_vitesse_altitude.png" width="90%" />
+      <br><em>Corrélation Vitesse vs Altitude (r=0.92)</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_17_corr_moteurs_duree.png" width="90%" />
+      <br><em>Corrélation Nb Moteurs vs Durée de vol</em>
+    </td>
+  </tr>
+  <tr>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+      <img src="Graphiques/graph_05_corr_destinations_duree.png" width="90%" />
+      <br><em>Corrélation Destinations vs Durée</em>
+    </td>
+    <td style="width: 50%; text-align: center; border: none; padding: 10px;">
+    </td>
+  </tr>
+</table>
+
+**Analyse – Corrélation Vitesse vs Altitude (r = 0.92) :** Ce nuage de points révèle une **corrélation très forte** (r = 0.92) entre l'altitude barométrique et la vitesse des aéronefs. Ce résultat est cohérent avec les principes de l'aéronautique : en montant en altitude, la densité de l'air diminue, ce qui permet aux avions d'atteindre des vitesses sol plus élevées tout en maintenant une portance suffisante. On observe clairement deux régimes : une phase de montée (0-3000m) où la vitesse augmente rapidement, puis une phase de croisière (>9000m) où la vitesse se stabilise autour de 230-280 m/s.
+
+**Analyse – Corrélation Nb Moteurs vs Durée (r = 0.21) :** La corrélation positive faible (r ≈ 0.21) suggère que les avions à 4 moteurs (long-courriers type A380/B747) effectuent en moyenne des vols plus longs que les monomoteurs. La coloration par type de motorisation (Jet, Turboprop, Piston) met en lumière la séparation nette entre les usages : les avions à piston (1 moteur) font des vols courts (<3h), tandis que les jets (2-4 moteurs) couvrent un spectre bien plus large.
+
+**Analyse – Corrélation Destinations vs Durée (r = -0.10) :** L'absence de corrélation significative (r ≈ -0.10) est en soi un résultat intéressant : le nombre de destinations desservies par un aéronef n'est pas lié à sa durée moyenne de vol. Un avion desservant de nombreuses destinations peut tout aussi bien faire des vols courts (navettes) que longs. Ce graphique montre aussi que les avions "Heavy" (en bleu) se distinguent par des durées moyennes systématiquement plus élevées, quelle que soit leur polyvalence.
 
 # 6. Problèmes Rencontrés, Solutions Apportées et Conclusion
 

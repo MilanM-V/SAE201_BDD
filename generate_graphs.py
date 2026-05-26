@@ -46,6 +46,46 @@ def graphique(cur,sql,typ,titre,xlab,ylab,fich,top=None):
     plt.savefig(fich,dpi=150)
     plt.close()
 
+def graphique_scatter(cur,sql,titre,xlab,ylab,fich,color_col=None):
+    """Génère un nuage de points (scatter) pour l'analyse de corrélation."""
+    cur.execute(sql)
+    data=cur.fetchall()
+    if not data:
+        print(f"  [!] Pas de données pour {titre}")
+        return
+    xs=[r[0] for r in data]
+    ys=[r[1] for r in data]
+    plt.figure(figsize=(10,6))
+    if color_col and len(data[0])>2:
+        cats=list(set(r[2] for r in data))
+        cat_colors={c:palette[i%len(palette)] for i,c in enumerate(cats)}
+        for c in cats:
+            cx=[r[0] for r in data if r[2]==c]
+            cy=[r[1] for r in data if r[2]==c]
+            plt.scatter(cx,cy,alpha=0.5,s=15,label=str(c),color=cat_colors[c])
+        plt.legend(fontsize=8,loc='best',title=color_col)
+    else:
+        plt.scatter(xs,ys,alpha=0.4,s=12,color=palette[0],edgecolors='none')
+    import numpy as np
+    xs_num=np.array([float(x) for x in xs if x is not None])
+    ys_num=np.array([float(y) for y in ys if y is not None])
+    if len(xs_num)>2:
+        mask=np.isfinite(xs_num)&np.isfinite(ys_num)
+        if mask.sum()>2:
+            r=np.corrcoef(xs_num[mask],ys_num[mask])[0,1]
+            z=np.polyfit(xs_num[mask],ys_num[mask],1)
+            p=np.poly1d(z)
+            x_line=np.linspace(xs_num[mask].min(),xs_num[mask].max(),100)
+            plt.plot(x_line,p(x_line),'--',color='#E91E63',linewidth=2,label=f'Tendance (r={r:.3f})')
+            plt.legend(fontsize=9)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.grid(True,alpha=0.2)
+    plt.title(titre,fontsize=13,fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(fich,dpi=150)
+    plt.close()
+
 def main():
 
     conn=sqlite3.connect(dbName)
@@ -82,6 +122,7 @@ WHERE a.icao24 IS NOT NULL AND a.icao24 != ''""")
     conn.commit()
 
     requetes=[]
+    scatter_queries=[]
 
     requetes.append(("Requête 1 (SELECT+JOIN) : Nombre de vols par type de moteur",
 """SELECT at.EngineType, COUNT(*) as nb_vols
@@ -121,14 +162,25 @@ ORDER BY nb_modeles DESC
 LIMIT 10""",
     "barh","Constructeur","Nombre de modèles","graph_04_top_constructeurs.png"))
 
-    requetes.append(("Requête 5 (SELECT+JOIN) : Avions par nombre de moteurs",
-"""SELECT at.EngineCount, COUNT(DISTINCT a.registration) as nb_avions
-FROM Aeronef a
-JOIN AircraftType at ON a.typecode = at.Designator
-WHERE at.EngineCount IS NOT NULL
-GROUP BY at.EngineCount
-ORDER BY at.EngineCount""",
-    "bar","Nombre de moteurs","Nombre d'avions","graph_05_nb_moteurs.png"))
+    scatter_queries.append(("Requête 5 (SCATTER+JOIN) : Corrélation Durée de vol vs Nombre de destinations de l'aéronef",
+"""WITH stats_aeronef AS (
+    SELECT v.registration,
+           AVG((v.landingtime - v.takeofftime) / 3600.0) as duree_moy_h,
+           COUNT(DISTINCT v.airportofdestination) as nb_destinations,
+           at.WTC
+    FROM Vol v
+    JOIN Aeronef a ON v.registration = a.registration
+    JOIN AircraftType at ON a.typecode = at.Designator
+    WHERE v.landingtime IS NOT NULL AND v.takeofftime IS NOT NULL
+      AND v.landingtime > v.takeofftime AND at.WTC IS NOT NULL
+      AND (v.landingtime - v.takeofftime) / 3600.0 BETWEEN 0.1 AND 20
+    GROUP BY v.registration
+    HAVING COUNT(*) >= 2
+)
+SELECT nb_destinations, duree_moy_h, WTC
+FROM stats_aeronef
+ORDER BY nb_destinations""",
+    "Nb destinations desservies","Durée moyenne de vol (h)","graph_05_corr_destinations_duree.png","WTC"))
 
     requetes.append(("Requête 6 (CTE) : Durée moyenne des vols (heures) par catégorie WTC",
 """WITH duree_vol AS (
@@ -187,11 +239,15 @@ GROUP BY tranche
 ORDER BY tranche""",
     "line","Tranche d'altitude","Vitesse moyenne (m/s)","graph_09_vitesse_altitude.png"))
 
-    requetes.append(("Requête 10 (VIEW) : Répartition par type d'aéronef (vue_type_aeronef)",
-"""SELECT AircraftDescription, nb
-FROM vue_type_aeronef
-ORDER BY nb DESC""",
-    "barh","Type d'aéronef","Nombre","graph_10_types_aeronef.png"))
+    scatter_queries.append(("Requête 10 (SCATTER) : Corrélation Vitesse vs Altitude (VecteurEtat)",
+"""SELECT baroaltitude, velocity
+FROM VecteurEtat
+WHERE baroaltitude IS NOT NULL AND velocity IS NOT NULL
+  AND onground = 0 AND velocity > 0 AND baroaltitude > 0
+  AND baroaltitude < 15000 AND velocity < 400
+ORDER BY RANDOM()
+LIMIT 3000""",
+    "Altitude barométrique (m)","Vitesse (m/s)","graph_10_corr_vitesse_altitude.png",None))
 
     requetes.append(("Requête 11 (CTE) : Durée moyenne des vols par Constructeur",
 """WITH duree_vol AS (
@@ -266,18 +322,18 @@ ORDER BY nb_messages DESC
 LIMIT 10""",
     "barh","Constructeur","Nombre de messages TCAS","graph_16_tcas_constructeur.png"))
 
-    requetes.append(("Requête 17 (CTE+JOIN) : Altitude moyenne (TCAS) par type d'aéronef",
-"""WITH stat_alt AS (
-    SELECT v.AircraftDescription, AVG(m.altitude) as alt_moy
-    FROM MessageTCAS m
-    JOIN vue_icao24_aeronef v ON m.icao24 = v.icao24
-    WHERE m.altitude IS NOT NULL
-    GROUP BY v.AircraftDescription
-)
-SELECT AircraftDescription, ROUND(alt_moy, 1) as altitude_moyenne
-FROM stat_alt
-ORDER BY altitude_moyenne DESC""",
-    "barh","Type d'aéronef","Altitude moyenne (ft)","graph_17_altitude_type.png"))
+    scatter_queries.append(("Requête 17 (SCATTER+JOIN) : Corrélation Nombre de moteurs vs Durée moyenne de vol",
+"""SELECT at.EngineCount, (v.landingtime - v.takeofftime) / 3600.0 as duree_h, at.EngineType
+FROM Vol v
+JOIN Aeronef a ON v.registration = a.registration
+JOIN AircraftType at ON a.typecode = at.Designator
+WHERE v.landingtime IS NOT NULL AND v.takeofftime IS NOT NULL
+  AND v.landingtime > v.takeofftime AND at.EngineCount IS NOT NULL
+  AND at.EngineType IS NOT NULL
+  AND (v.landingtime - v.takeofftime) / 3600.0 BETWEEN 0.1 AND 20
+ORDER BY RANDOM()
+LIMIT 3000""",
+    "Nombre de moteurs","Durée de vol (h)","graph_17_corr_moteurs_duree.png","EngineType"))
 
     requetes.append(("Requête 18 (SELECT) : Top 10 des codes Squawk les plus utilisés",
 """SELECT squawk, COUNT(*) as nb_occurrences
@@ -361,6 +417,11 @@ WHERE a.icao24 IS NOT NULL AND a.icao24 != '';\n\n""")
         print(f"  -> {nom}")
         chemin_complet = os.path.join("Graphiques", fich)
         graphique(cursor,sql,typ,nom.split(': ',1)[1] if ': ' in nom else nom,xlab,ylab,chemin_complet)
+
+    for nom,sql,xlab,ylab,fich,color_col in scatter_queries:
+        print(f"  -> {nom}")
+        chemin_complet = os.path.join("Graphiques", fich)
+        graphique_scatter(cursor,sql,nom.split(': ',1)[1] if ': ' in nom else nom,xlab,ylab,chemin_complet,color_col)
 
     conn.close()
 

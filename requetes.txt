@@ -240,14 +240,6 @@ GROUP BY ManufacturerCode
 ORDER BY nb_modeles DESC
 LIMIT 10;
 
--- Requête 5 (SELECT+JOIN) : Avions par nombre de moteurs
-SELECT at.EngineCount, COUNT(DISTINCT a.registration) as nb_avions
-FROM Aeronef a
-JOIN AircraftType at ON a.typecode = at.Designator
-WHERE at.EngineCount IS NOT NULL
-GROUP BY at.EngineCount
-ORDER BY at.EngineCount;
-
 -- Requête 6 (CTE) : Durée moyenne des vols (heures) par catégorie WTC
 WITH duree_vol AS (
     SELECT (v.landingtime - v.takeofftime) / 3600.0 as duree_h, at.WTC
@@ -300,11 +292,6 @@ SELECT tranche || 'm' as tranche_alt, ROUND(AVG(velocity), 1) as vitesse_moy
 FROM tranches
 GROUP BY tranche
 ORDER BY tranche;
-
--- Requête 10 (VIEW) : Répartition par type d'aéronef (vue_type_aeronef)
-SELECT AircraftDescription, nb
-FROM vue_type_aeronef
-ORDER BY nb DESC;
 
 -- Requête 11 (CTE) : Durée moyenne des vols par Constructeur
 WITH duree_vol AS (
@@ -372,18 +359,6 @@ WHERE v.ManufacturerCode IS NOT NULL
 GROUP BY v.ManufacturerCode
 ORDER BY nb_messages DESC
 LIMIT 10;
-
--- Requête 17 (CTE+JOIN) : Altitude moyenne (TCAS) par type d'aéronef
-WITH stat_alt AS (
-    SELECT v.AircraftDescription, AVG(m.altitude) as alt_moy
-    FROM MessageTCAS m
-    JOIN vue_icao24_aeronef v ON m.icao24 = v.icao24
-    WHERE m.altitude IS NOT NULL
-    GROUP BY v.AircraftDescription
-)
-SELECT AircraftDescription, ROUND(alt_moy, 1) as altitude_moyenne
-FROM stat_alt
-ORDER BY altitude_moyenne DESC;
 
 -- Requête 18 (SELECT) : Top 10 des codes Squawk les plus utilisés
 SELECT squawk, COUNT(*) as nb_occurrences
