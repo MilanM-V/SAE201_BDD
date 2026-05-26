@@ -4,6 +4,7 @@ import ast
 import os
 import openpyxl
 import matplotlib.pyplot as plt
+import json
 
 """Configuration"""
 dbName="aviation.db"
@@ -15,6 +16,7 @@ aircraftTypesCsv="0-typeaircraft/AircraftTypes.csv"
 flightSampleCsv="0-flightsample/flight_sample_2022-09-01.csv"
 airbusTreeCsv="0-airbustree/airbus_tree.csv"
 sensorXlsx="1-dataSensor/part_1.xlsx"
+airportsJson="0-typeaircraft/airports.json"
 
 """Fonctions simples pour nettoyer les données"""
 def clean(val):
@@ -58,6 +60,17 @@ def main():
     with open(sqlSchema,"r",encoding="utf-8") as f:
         conn.executescript(f.read())
     print("Tables créées.")
+
+    """Etape 1.5 : Aéroports (Aeroport_Ref)"""
+    print("Traitement des aéroports...")
+    if os.path.exists(airportsJson):
+        with open(airportsJson,"r",encoding="utf-8") as f:
+            airports=json.load(f)
+            for key,info in airports.items():
+                icao=clean(info.get("icao"))
+                if icao:
+                    conn.execute("INSERT OR IGNORE INTO Aeroport_Ref VALUES (?,?,?,?)",(icao,clean(info.get("name")),clean(info.get("city")),clean(info.get("country"))))
+        conn.commit()
 
     """Etape 2 : AircraftTypes"""
     print("Traitement AircraftTypes...")

@@ -5,12 +5,25 @@
 -- ============================================================
 
 -- Suppression des tables si elles existent (ordre inverse des FK)
+DROP TABLE IF EXISTS Aeroport_Ref;
 DROP TABLE IF EXISTS CapteurReception;
 DROP TABLE IF EXISTS MessageTCAS;
 DROP TABLE IF EXISTS VecteurEtat;
 DROP TABLE IF EXISTS Vol;
 DROP TABLE IF EXISTS Aeronef;
 DROP TABLE IF EXISTS AircraftType;
+
+-- ============================================================
+-- Table 0 : Aeroport_Ref
+-- Source : Fichier Open source airports.json
+-- Clé primaire : code_oaci
+-- ============================================================
+CREATE TABLE Aeroport_Ref (
+    code_oaci   TEXT PRIMARY KEY,
+    nom         TEXT,
+    ville       TEXT,
+    pays        TEXT
+);
 
 -- ============================================================
 -- Table 1 : AircraftType
